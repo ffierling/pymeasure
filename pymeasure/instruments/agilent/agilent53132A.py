@@ -31,33 +31,20 @@ from pymeasure.instruments.validators import strict_discrete_set
 
 class Agilent53132A(Instrument):
     """ Represents the Agilent 53132A Frequency Counter
-    to provide a high-level interface for interacting
-    with the instrument.
-    """
+    with a S/N prefix >= 3646 and provides a high-level
+    interface for interacting with the instrument.
+    """  # Tested on a 53132A with firmware revision 3944
 
-    SHAPES = {
-        'sinusoid':'SIN', 'square':'SQU', 'triangle':'TRI', 
-        'ramp':'RAMP', 'noise':'NOIS', 'dc':'DC', 'user':'USER'
-    }
-    shape = Instrument.control(
-        "SOUR:FUNC:SHAP?", "SOUR:FUNC:SHAP %s",
-        """ A string property that controls the shape of the wave,
-        which can take the values: sinusoid, square, triangle, ramp,
-        noise, dc, and user. """,
-        validator=strict_discrete_set,
-        values=SHAPES,
-        map_values=True
-    )
-    frequency = Instrument.control(
-        "SOUR:FREQ?", "SOUR:FREQ %g",
+    frequency_ch1 = Instrument.measurement(
+        ":MEAS:FREQ? (@1)",
         """ A floating point property that controls the frequency of the
         output in Hz. The allowed range depends on the waveform shape
         and can be queried with :attr:`~.max_frequency` and 
         :attr:`~.min_frequency`. """
     )
-    max_frequency = Instrument.measurement(
-        "SOUR:FREQ? MAX", 
-        """ Reads the maximum :attr:`~.Agilent53132A.frequency` in Hz for the given shape """
+    error = Instrument.measurement(
+        "SYST:ERR?", 
+        """ Returns oldest error as a list comprising [<error number>, <error string>] """
     )
     min_frequency = Instrument.measurement(
         "SOUR:FREQ? MIN", 
@@ -110,8 +97,30 @@ class Agilent53132A(Instrument):
             "Agilent 53132A Frequency Counter",
             **kwargs
         )
-        self.amplitude_units = 'Vpp'
+        #self.rw_delay = 0.1 #  Don't use because it applies to every instrument on the adapter
 
-    def beep(self):
-        """ Causes a system beep. """
-        self.write("SYST:BEEP")
+    def reset(self):
+        """ Reset counter to a known state """
+        self.write("*RST")
+        self.write("*CLS")
+        self.write("*SRE 0")
+        self.write("*ESE 0")
+        self.write(":STAT:PRES")
+
+    def frequency(self, ch, gate_time=10e-3):
+        #print(self.ask('*STB?'))
+        self.write("FUNC 'FREQ %d'" % ch)
+        self.write(":FREQ:ARM:STAR:SOUR IMM")
+        self.write(":FREQ:ARM:STOP:SOUR TIM")
+        self.write(":FREQ:ARM:STOP:TIM  %f" % gate_time)
+        #print(self.ask('*STB?'))
+        #self.write(':GATE:TIME 1')
+        self.write('INIT')  # Initiate measurement
+        x = self.ask('*OPC?')  # Put 1 in buffer when done
+        #i = 0
+        while x == '':
+            x = self.read()
+            #i += 1
+        #print(i)
+        #print(x.encode('utf-8').hex())
+        return float(self.ask('FETC:FREQ?'))

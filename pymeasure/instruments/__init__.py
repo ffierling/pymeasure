@@ -47,6 +47,7 @@ from . import oxfordinstruments
 from . import parker
 from . import signalrecovery
 from . import srs
+from . import sunelectronic
 from . import tektronix
 from . import thorlabs
 from . import yokogawa
