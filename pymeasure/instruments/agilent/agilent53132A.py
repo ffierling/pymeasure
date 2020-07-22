@@ -35,60 +35,14 @@ class Agilent53132A(Instrument):
     interface for interacting with the instrument.
     """  # Tested on a 53132A with firmware revision 3944
 
-    frequency_ch1 = Instrument.measurement(
-        ":MEAS:FREQ? (@1)",
-        """ A floating point property that controls the frequency of the
-        output in Hz. The allowed range depends on the waveform shape
-        and can be queried with :attr:`~.max_frequency` and 
-        :attr:`~.min_frequency`. """
+    FUNCTIONS = ('DCYC', 'FTIM', 'FREQ', 'MAX',
+            'MIN', 'NWID', 'PER', 'PHA', 'PTP',
+            'PWID', 'RTIM', 'TINT', 'TOT'
     )
+
     error = Instrument.measurement(
         "SYST:ERR?", 
         """ Returns oldest error as a list comprising [<error number>, <error string>] """
-    )
-    min_frequency = Instrument.measurement(
-        "SOUR:FREQ? MIN", 
-        """ Reads the minimum :attr:`~.Agilent53132A.frequency` in Hz for the given shape """
-    )
-    amplitude = Instrument.control(
-        "SOUR:VOLT?", "SOUR:VOLT %g",
-        """ A floating point property that controls the voltage amplitude of the
-        output signal. The default units are in  peak-to-peak Volts, but can be
-        controlled by :attr:`~.amplitude_units`. The allowed range depends 
-        on the waveform shape and can be queried with :attr:`~.max_amplitude`
-        and :attr:`~.min_amplitude`. """
-    )
-    max_amplitude = Instrument.measurement(
-        "SOUR:VOLT? MAX", 
-        """ Reads the maximum :attr:`~.amplitude` in Volts for the given shape """
-    )
-    min_amplitude = Instrument.measurement(
-        "SOUR:VOLT? MIN", 
-        """ Reads the minimum :attr:`~.amplitude` in Volts for the given shape """
-    )
-    offset = Instrument.control(
-        "SOUR:VOLT:OFFS?", "SOUR:VOLT:OFFS %g",
-        """ A floating point property that controls the amplitude voltage offset
-        in Volts. The allowed range depends on the waveform shape and can be
-        queried with :attr:`~.max_offset` and :attr:`~.min_offset`. """
-    )
-    max_offset = Instrument.measurement(
-        "SOUR:VOLT:OFFS? MAX", 
-        """ Reads the maximum :attr:`~.offset` in Volts for the given shape """
-    )
-    min_offset = Instrument.measurement(
-        "SOUR:VOLT:OFFS? MIN", 
-        """ Reads the minimum :attr:`~.offset` in Volts for the given shape """
-    )
-    AMPLITUDE_UNITS = {'Vpp':'VPP', 'Vrms':'VRMS', 'dBm':'DBM', 'default':'DEF'}
-    amplitude_units = Instrument.control(
-        "SOUR:VOLT:UNIT?", "SOUR:VOLT:UNIT %s",
-        """ A string property that controls the units of the amplitude,
-        which can take the values Vpp, Vrms, dBm, and default.
-        """,
-        validator=strict_discrete_set,
-        values=AMPLITUDE_UNITS,
-        map_values=True
     )
 
     def __init__(self, resourceName, **kwargs):
@@ -98,6 +52,7 @@ class Agilent53132A(Instrument):
             **kwargs
         )
         #self.rw_delay = 0.1 #  Don't use because it applies to every instrument on the adapter
+        self.reset()
 
     def reset(self):
         """ Reset counter to a known state """
@@ -107,14 +62,13 @@ class Agilent53132A(Instrument):
         self.write("*ESE 0")
         self.write(":STAT:PRES")
 
-    def frequency(self, ch, gate_time=10e-3):
-        #print(self.ask('*STB?'))
-        self.write("FUNC 'FREQ %d'" % ch)
+    def function(self, f, ch, gate_time=10e-3):
+        self.write("FUNC '%s %d'" % (f, ch))
         self.write(":FREQ:ARM:STAR:SOUR IMM")
         self.write(":FREQ:ARM:STOP:SOUR TIM")
         self.write(":FREQ:ARM:STOP:TIM  %f" % gate_time)
-        #print(self.ask('*STB?'))
-        #self.write(':GATE:TIME 1')
+
+    def frequency(self):
         self.write('INIT')  # Initiate measurement
         x = self.ask('*OPC?')  # Put 1 in buffer when done
         #i = 0
