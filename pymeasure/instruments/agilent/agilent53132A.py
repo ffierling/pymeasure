@@ -40,6 +40,14 @@ class Agilent53132A(Instrument):
             'PWID', 'RTIM', 'TINT', 'TOT'
     )
 
+    function_ = Instrument.control(
+        "FUNC?", "FUNC '%g'",
+        """ A floating point property that controls the frequency of the
+        output in Hz. The allowed range depends on the waveform shape
+        and can be queried with :attr:`~.max_frequency` and 
+        :attr:`~.min_frequency`. """
+    )
+
     error = Instrument.measurement(
         "SYST:ERR?", 
         """ Returns oldest error as a list comprising [<error number>, <error string>] """
@@ -61,14 +69,18 @@ class Agilent53132A(Instrument):
         self.write("*SRE 0")
         self.write("*ESE 0")
         self.write(":STAT:PRES")
+        self.func = 'FREQ'
 
-    def function(self, f, ch, gate_time=10e-3):
-        self.write("FUNC '%s %d'" % (f, ch))
-        self.write(":FREQ:ARM:STAR:SOUR IMM")
-        self.write(":FREQ:ARM:STOP:SOUR TIM")
-        self.write(":FREQ:ARM:STOP:TIM  %f" % gate_time)
+    def function(self, cmd):
+        f = cmd.split()
+        
+        if f[0] in FUNCTIONS:
+            self.func = f[0]
+            self.write("FUNC '%s'" % cmd)
+        else:
+            return  # ??? error processing
 
-    def frequency(self):
+    def measure():
         self.write('INIT')  # Initiate measurement
         x = self.ask('*OPC?')  # Put 1 in buffer when done
         #i = 0
@@ -77,4 +89,9 @@ class Agilent53132A(Instrument):
             #i += 1
         #print(i)
         #print(x.encode('utf-8').hex())
-        return float(self.ask('FETC:FREQ?'))
+        return float(self.ask('FETC:%s?' % self.func))
+
+    def gate(time=10e-3):
+        self.write(":FREQ:ARM:STAR:SOUR IMM")
+        self.write(":FREQ:ARM:STOP:SOUR TIM")
+        self.write(":FREQ:ARM:STOP:TIM  %f" % time)
