@@ -74,13 +74,13 @@ class Agilent53132A(Instrument):
     def function(self, cmd):
         f = cmd.split()
         
-        if f[0] in FUNCTIONS:
+        if f[0] in self.FUNCTIONS:
             self.func = f[0]
             self.write("FUNC '%s'" % cmd)
         else:
             return  # ??? error processing
 
-    def measure():
+    def measure(self):
         self.write('INIT')  # Initiate measurement
         x = self.ask('*OPC?')  # Put 1 in buffer when done
         #i = 0
@@ -91,7 +91,7 @@ class Agilent53132A(Instrument):
         #print(x.encode('utf-8').hex())
         return float(self.ask('FETC:%s?' % self.func))
 
-    def gate(time=10e-3):
+    def gate(self, time=10e-3):
         self.write(":FREQ:ARM:STAR:SOUR IMM")
         self.write(":FREQ:ARM:STOP:SOUR TIM")
         self.write(":FREQ:ARM:STOP:TIM  %f" % time)
