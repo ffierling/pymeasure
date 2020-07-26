@@ -30,9 +30,15 @@ from pymeasure.instruments import Instrument
 from pymeasure.instruments.validators import strict_discrete_set
 
 class Agilent53132A(Instrument):
-    """ Represents the Agilent 53132A Frequency Counter
-    with a S/N prefix >= 3646 and provides a high-level
+    """ Represents a simplified Agilent 53132A Frequency
+    Counter with a S/N prefix >= 3646 and provides a high-level
     interface for interacting with the instrument.
+
+    This simple model of a counter minimizes the changes necessary
+    to swap a different counter into the test environment.
+    Manufacturer and model specific commands not supported by 
+    most counters should be implemented with read, write and ask
+    methods.
     """  # Tested on a 53132A with firmware revision 3944
 
     FUNCTIONS = ('DCYC', 'FTIM', 'FREQ', 'MAX',
@@ -40,12 +46,10 @@ class Agilent53132A(Instrument):
             'PWID', 'RTIM', 'TINT', 'TOT'
     )
 
-    function_ = Instrument.control(
-        "FUNC?", "FUNC '%g'",
-        """ A floating point property that controls the frequency of the
-        output in Hz. The allowed range depends on the waveform shape
-        and can be queried with :attr:`~.max_frequency` and 
-        :attr:`~.min_frequency`. """
+    GATES = ('TIME', 'DIGITS'
+    )
+
+    INPUTS = ('ATT', 'COUP', 'IMP'
     )
 
     error = Instrument.measurement(
@@ -91,7 +95,31 @@ class Agilent53132A(Instrument):
         #print(x.encode('utf-8').hex())
         return float(self.ask('FETC:%s?' % self.func))
 
-    def gate(self, time=10e-3):
-        self.write(":FREQ:ARM:STAR:SOUR IMM")
-        self.write(":FREQ:ARM:STOP:SOUR TIM")
-        self.write(":FREQ:ARM:STOP:TIM  %f" % time)
+    def gate(self, cmd):
+        f = cmd.split()
+
+        if f[0] == 'TIME':
+            self.write(":FREQ:ARM:STAR:SOUR IMM")
+            self.write(":FREQ:ARM:STOP:SOUR TIM")
+            self.write(":FREQ:ARM:STOP:TIM  %f" % float(f[1]))
+        elif f[0] == 'DIGITS':
+            self.write(":FREQ:ARM:STAR:SOUR IMM")
+            self.write(":FREQ:ARM:STOP:SOUR TIM")
+            self.write(":FREQ:ARM:STOP:DIG  %f" % float(f[1]))
+        else:
+            return  # ??? error processing
+
+    def input(self, cmd, n=1):
+        f = cmd.split()
+
+        if f[0] == 'ATT':
+            self.write(":INP%d:ATT  %d" % (n, int(f[1])))
+
+        elif f[0] == 'COUP':
+            self.write(":INP%d:COUP  %s" % (n, f[1]))
+
+        elif f[0] == 'IMP':
+            self.write(":INP%d:IMP  %f" % (n, float(f[1])))
+
+        else:
+            return  # ??? error processing
